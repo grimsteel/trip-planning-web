@@ -1,35 +1,45 @@
-import { onMount } from "svelte";
-import SyncWorker from "$lib/sync-worker?sharedworker";
-import type { Id, TripAttrs } from "./db";
+import syncWorker from "./sync-worker?sharedworker&url";
+import { browser } from "$app/environment";
+import { proxy, transferHandlers, wrap } from "comlink";
+import type { LoroObject } from "./sync-worker";
+import { isLoroClient, loroClientHandler, type LoroClient, LoroMapClient } from "./loro-converters/client";
+import { readable, type Readable } from "svelte/store";
+import type { ClientDbStructure, Id } from "./db";
 
-type Subscription<T> = (value: T) => void;
-type Trips = Record<Id, { attrs: TripAttrs, cities: Id[] }>;
+// Some default stuff to aid with prerendering
+const defaultLoroObject = {
+  getContainer: (_path: string) => null,
+  subscribe: (_path: string, _callback: Function) => Promise.resolve(null),
+  unsubscribe: (id: number) => {},
+  save: () => {},
+  trips: null
+};
 
-let worker: SharedWorker | null = null;
+const worker = browser ? new SharedWorker(syncWorker, { type: "module", credentials: "same-origin", name: "sync-worker" }) : null;
+const loroObject = worker ? wrap<LoroObject>(worker.port) : defaultLoroObject;
 
-onMount(() => {
-  worker = new SyncWorker({ name: "sync-worker" });
-  console.log("hi 2");
-});
+transferHandlers.set("loro-transport", loroClientHandler);
 
-console.log("hi 1")
+export async function subscribeToContainer<T extends {}>(path: string) {
+  const currentValue = (await loroObject.getContainer(path)) as T | null;
+  if (currentValue) {
+    return readable(currentValue, set => {
+      let subscriptionId: number | null = null;
+      // Update when we get a subscription push
+      loroObject.subscribe(path, proxy((value: T) => {
+        set(value);
+      })).then(id => subscriptionId = id);
 
-export const trips = {
-  subscriptions: [] as Subscription<Trips>[],
-  currentValue: {} as Trips,
-  subscriptionId: null as number | null,
-
-  subscribe(subscription: Subscription<Trips>) {
-    subscription(this.currentValue);
-    this.subscriptions.push(subscription);
-    return () => {
-      
-    }
-  },
-
-  startSubscribing() {
-    if (this.subscriptionId === null && worker !== null) {
-      // TODO: stuff with worker
-    }
+      return () => subscriptionId && loroObject.unsubscribe(subscriptionId)
+    });
+  } else {
+    // Just return a null-store
+    return readable(null);
   }
 }
+
+let _trips: Readable<ClientDbStructure["trips"] | null> | null = null;
+let _cities: Readable<ClientDbStructure["cities"] | null> | null = null;
+export const trips = async () => _trips ?? (_trips = await subscribeToContainer<ClientDbStructure["trips"]>("trips"));
+export const cities = async () => _cities ?? (_cities = await subscribeToContainer<ClientDbStructure["cities"]>("cities"));
+export const loro = loroObject;

@@ -1,20 +1,27 @@
 import { get, set } from "idb-keyval";
 import { Loro, LoroMap, LoroMovableList, VersionVector, type Container } from "loro-crdt";
 import { nanoid } from "nanoid";
+import type { LoroMapClient, LoroMovableListClient } from "./loro-converters/client";
 
 // Just to make it clear
 export type Id = string;
 export type DoubleId = `${Id}${Id}`;
-type MapWithAttrs<Attrs, T extends Record<string, unknown>> = LoroMap<{ attrs: Attrs } & T>;
-export interface TripAttrs { name: string, date: string };
-export interface CityAttrs { name: string, lat: number, long: number };
 
 interface DbStructure {
-  trips: LoroMap<Record<Id, MapWithAttrs<TripAttrs, { cities: LoroMovableList<Id> }>>>,
-  cities: LoroMap<Record<Id, MapWithAttrs<CityAttrs, { places: LoroMovableList<Id> }>>>,
+  trips: LoroMap<Record<Id, LoroMap<{ name: string, date: string, cities: LoroMovableList<Id> }>>>,
+  cities: LoroMap<Record<Id, LoroMap<{ name: string, lat: number, long: number, places: LoroMovableList<Id> }>>>,
   edges: LoroMap<Record<DoubleId, LoroMovableList<Id>>>,
   [key: string]: Container
 }
+
+// TODO: use the auto mapping fgrom sync-worker
+export interface ClientDbStructure {
+  trips: LoroMapClient<Record<Id, LoroMapClient<TripClient>>>,
+  cities: LoroMapClient<Record<Id, LoroMapClient<CityClient>>>,
+}
+
+export type TripClient = { name: string, date: string, cities: LoroMovableListClient<Id> };
+export type CityClient = { name: string, lat: number, long: number, places: LoroMovableListClient<Id> };
 
 export const randomId = () => nanoid(10);
 
