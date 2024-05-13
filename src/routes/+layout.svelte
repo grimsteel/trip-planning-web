@@ -26,7 +26,7 @@
       <a href="/" class={navLink({ active: $page.route.id === "/" })}>
         Trip Dashboard
       </a>
-      <a href="/" class={navLink()}>
+      <a href="/trips" class={navLink()}>
         Trips
       </a>
       <a href="/cities" class={navLink({ active: $page.route.id === "/cities" })}>

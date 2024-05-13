@@ -61,7 +61,7 @@ const config = {
 			}
 		}
 	},
-  plugins: [forms(), typography()],
+  plugins: [/*forms(),*/ typography()],
 };
 
 export default config;

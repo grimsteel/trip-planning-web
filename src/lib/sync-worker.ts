@@ -1,12 +1,8 @@
 import type { ProxyMarked } from "comlink";
-import type { Container, LoroList, LoroMap, LoroMovableList } from "loro-crdt";
+import type { LoroList, LoroMap, LoroMovableList } from "loro-crdt";
 import type { LoroListClient, LoroMapClient, LoroMovableListClient } from "./loro-converters/client";
 
 declare const self: SharedWorkerGlobalScope;
-
-function containerToString(container: Container) {
-  return container instanceof LoroText ? container.toString() : container.toJSON();
-}
 
 // This is an ES module with top level await, but the initial connect ev is fired immediately for SharedWorkers
 
@@ -15,13 +11,13 @@ let initialPort = null as MessagePort | null;
 // Initial listener to just get a hold of the initial port
 self.addEventListener("connect", e => {
   initialPort = e.ports[0];
-  initialPort.addEventListener("message", e => console.log(e))
+  //initialPort.addEventListener("message", e => console.log(e))
 }, { once: true });
 
 // Load everything now that we have the initial port
 const { expose, transferHandlers } = await import ("comlink");
 const { loadLoroSave, saveLoro } = await import("$lib/db");
-const { LoroText, isContainer } = await import("loro-crdt");
+const { isContainer } = await import("loro-crdt");
 const { loroWorkerHandler } = await import("./loro-converters/worker");
 
 transferHandlers.set("loro-transport", loroWorkerHandler)
@@ -36,6 +32,7 @@ const clientObject = {
   cities: loro.getMap("cities"),
 
   getContainer(path: string) {
+    console.debug("get", path)
     const container = loro.getByPath(path);
     if (isContainer(container)) {
       return container;
@@ -44,6 +41,7 @@ const clientObject = {
     }
   },
   subscribe(path: string, callback: ((value: any) => void) & ProxyMarked) {
+    console.debug("subscribe", path);
     const container = this.getContainer(path);
     if (container) {
       return container.subscribe(() => {
@@ -55,9 +53,19 @@ const clientObject = {
     }
   },
   unsubscribe(id: number) {
+    console.debug("unsubscribe", id);
     loro.unsubscribe(id);
   },
-  save: () => saveLoro(loro)
+  save: () => saveLoro(loro),
+
+  // More specific functions
+  editCity(id: string, lat: number, long: number) {
+    const city = this.cities.get(id);
+    if (city) {
+      city.set("lat", lat);
+      city.set("long", long);
+    }
+  }
 };
 
 // Handle the initial port

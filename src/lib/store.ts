@@ -12,7 +12,9 @@ const defaultLoroObject = {
   subscribe: (_path: string, _callback: Function) => Promise.resolve(null),
   unsubscribe: (id: number) => {},
   save: () => {},
-  trips: null
+  trips: null,
+  cities: null,
+  editCity: (...args: any[]) => {}
 };
 
 const worker = browser ? new SharedWorker(syncWorker, { type: "module", credentials: "same-origin", name: "sync-worker" }) : null;
@@ -30,7 +32,11 @@ export async function subscribeToContainer<T extends {}>(path: string) {
         set(value);
       })).then(id => subscriptionId = id);
 
-      return () => subscriptionId && loroObject.unsubscribe(subscriptionId)
+      (<Promise<T | null>>loroObject.getContainer(path)).then(value => value && set(value));
+
+      return () => {
+        if (subscriptionId !== null) loroObject.unsubscribe(subscriptionId)
+      }
     });
   } else {
     // Just return a null-store
@@ -39,6 +45,7 @@ export async function subscribeToContainer<T extends {}>(path: string) {
 }
 
 let _trips: Readable<ClientDbStructure["trips"] | null> | null = null;
+console.log("imported")
 let _cities: Readable<ClientDbStructure["cities"] | null> | null = null;
 export const trips = async () => _trips ?? (_trips = await subscribeToContainer<ClientDbStructure["trips"]>("trips"));
 export const cities = async () => _cities ?? (_cities = await subscribeToContainer<ClientDbStructure["cities"]>("cities"));

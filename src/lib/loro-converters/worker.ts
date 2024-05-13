@@ -1,9 +1,12 @@
 // Comlink wrappers for Loro items
 
 import type { TransferHandler } from "comlink";
-import { LoroMap, type Container, LoroMovableList, isContainer, LoroList } from "loro-crdt";
+import { LoroMap, type Container, LoroMovableList, LoroList } from "loro-crdt";
 import { isLoroTransport, type LoroListTransport, type LoroMapTransport, type LoroTransport } from "./transport";
-import type { LoroMapClient } from "./client";
+
+function isContainer(c: any): c is Container {
+  return c instanceof LoroMap || c instanceof LoroMovableList || c instanceof LoroList;
+}
 
 // Convert a loro container into our transport type depending on what it is
 function serializeContainer(container: Container): LoroTransport {

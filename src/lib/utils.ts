@@ -2,6 +2,35 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { cubicOut } from "svelte/easing";
 import type { TransitionConfig } from "svelte/transition";
+import type { LoroMapClient } from "./loro-converters/client";
+import { readable, type Readable, type Unsubscriber } from "svelte/store";
+
+export function flattenLoroClientMap<T extends Record<string, unknown>>(obj: Record<string, LoroMapClient<T>>): Record<string, T> {
+	return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, v.value]));
+}
+
+export function recordToArray<T, K extends string>(obj: Record<string, T>, keyName: K): (T & { [obj in K]: string })[] {
+	return Object.entries<T>(obj).map(([key, value]) => ({
+		[keyName]: key,
+		...value
+	} as (T & { [obj in K]: string })));
+}
+
+export function unpromisifyStore<T, R>(store: Promise<Readable<T | null>>, transform: (value: T) => R, defaultValue: R): Readable<R> {
+	return readable(defaultValue, set => {
+		let unsubscribe: Unsubscriber | null = null;
+
+    store.then(s => {
+      unsubscribe = s.subscribe(value => {
+        if (value === null) set(defaultValue);
+        else {
+          set(transform(value));
+        }
+      });
+    });
+    return () => unsubscribe?.();
+	});
+}
 
 export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
